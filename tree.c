@@ -144,8 +144,29 @@ static int write_tree_recursive(IndexEntry *entries, int count, int depth, Objec
             i++;
         } else {
             // Directory: needs recursive handling
-            // TODO: Implement subdirectory logic
-            i++; // Placeholder to avoid infinite loop
+            size_t name_len = slash - start;
+            char subdir_name[256];
+            if (name_len >= sizeof(subdir_name)) return -1;
+            memcpy(subdir_name, start, name_len);
+            subdir_name[name_len] = '\0';
+
+            // Find entries belonging to this subdirectory (all sharing the same prefix up to the slash)
+            int group_count = 0;
+            while (i + group_count < count) {
+                char *next_path = entries[i + group_count].path;
+                char *next_start = next_path;
+                for (int d = 0; d < depth; d++) {
+                    next_start = strchr(next_start, '/') + 1;
+                }
+                if (strncmp(next_start, subdir_name, name_len) == 0 && next_start[name_len] == '/') {
+                    group_count++;
+                } else {
+                    break;
+                }
+            }
+            
+            // TODO: Call recursively and update tree
+            i += group_count;
         }
     }
 
