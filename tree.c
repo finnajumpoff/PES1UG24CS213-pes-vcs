@@ -165,7 +165,17 @@ static int write_tree_recursive(IndexEntry *entries, int count, int depth, Objec
                 }
             }
             
-            // TODO: Call recursively and update tree
+            ObjectID subdir_hash;
+            if (write_tree_recursive(&entries[i], group_count, depth + 1, &subdir_hash) != 0)
+                return -1;
+
+            if (tree.count >= MAX_TREE_ENTRIES) return -1;
+            TreeEntry *te = &tree.entries[tree.count++];
+            te->mode = MODE_DIR;
+            te->hash = subdir_hash;
+            strncpy(te->name, subdir_name, sizeof(te->name) - 1);
+            te->name[sizeof(te->name) - 1] = '\0';
+
             i += group_count;
         }
     }
