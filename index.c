@@ -24,6 +24,12 @@
 #include <unistd.h>
 #include <dirent.h>
 
+// Forward declarations for object.c functions (as seen in test_objects.c)
+int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
+int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out);
+int object_exists(const ObjectID *id);
+void object_path(const ObjectID *id, char *path_out, size_t path_size);
+
 // ─── PROVIDED ────────────────────────────────────────────────────────────────
 
 // Find an index entry by path (linear scan).
@@ -168,33 +174,41 @@ static int compare_entries(const void *a, const void *b) {
 
 // Save the index to .pes/index atomically.
 int index_save(const Index *index) {
-    // Sort entries by path before saving
-    Index sorted_index = *index;
-    if (sorted_index.count > 0) {
-        qsort(sorted_index.entries, sorted_index.count, sizeof(IndexEntry), compare_entries);
+    // Sort entries by path before saving. We copy the entries to a temporary
+    // array instead of copying the whole Index struct to avoid stack overflow.
+    IndexEntry *sorted_entries = NULL;
+    if (index->count > 0) {
+        sorted_entries = malloc(index->count * sizeof(IndexEntry));
+        if (!sorted_entries) return -1;
+        memcpy(sorted_entries, index->entries, index->count * sizeof(IndexEntry));
+        qsort(sorted_entries, index->count, sizeof(IndexEntry), compare_entries);
     }
 
     char temp_path[512];
     snprintf(temp_path, sizeof(temp_path), "%s.tmp", INDEX_FILE);
 
     FILE *fp = fopen(temp_path, "w");
-    if (!fp) return -1;
+    if (!fp) {
+        free(sorted_entries);
+        return -1;
+    }
 
     char hash_hex[HASH_HEX_SIZE + 1];
-    for (int i = 0; i < sorted_index.count; i++) {
-        hash_to_hex(&sorted_index.entries[i].hash, hash_hex);
+    for (int i = 0; i < index->count; i++) {
+        hash_to_hex(&sorted_entries[i].hash, hash_hex);
         fprintf(fp, "%o %s %llu %u %s\n",
-                sorted_index.entries[i].mode,
+                sorted_entries[i].mode,
                 hash_hex,
-                (unsigned long long)sorted_index.entries[i].mtime_sec,
-                sorted_index.entries[i].size,
-                sorted_index.entries[i].path);
+                (unsigned long long)sorted_entries[i].mtime_sec,
+                sorted_entries[i].size,
+                sorted_entries[i].path);
     }
 
     fflush(fp);
     int fd = fileno(fp);
     fsync(fd);
     fclose(fp);
+    free(sorted_entries);
 
     if (rename(temp_path, INDEX_FILE) != 0) {
         unlink(temp_path);
