@@ -259,6 +259,5 @@ int index_add(Index *index, const char *path) {
     entry->mtime_sec = (uint64_t)st.st_mtime;
     entry->size = (uint32_t)st.st_size;
 
-    // TODO: Save the index
-    return 0;
+    return index_save(index);
 }
