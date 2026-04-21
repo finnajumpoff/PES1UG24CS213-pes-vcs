@@ -243,6 +243,22 @@ int index_add(Index *index, const char *path) {
     }
     free(data);
 
-    // TODO: Update the index entry with the new hash and metadata
+    IndexEntry *entry = index_find(index, path);
+    if (!entry) {
+        if (index->count >= MAX_INDEX_ENTRIES) {
+            fprintf(stderr, "error: index full\n");
+            return -1;
+        }
+        entry = &index->entries[index->count++];
+        strncpy(entry->path, path, sizeof(entry->path) - 1);
+        entry->path[sizeof(entry->path) - 1] = '\0';
+    }
+
+    entry->mode = (uint32_t)st.st_mode;
+    entry->hash = id;
+    entry->mtime_sec = (uint64_t)st.st_mtime;
+    entry->size = (uint32_t)st.st_size;
+
+    // TODO: Save the index
     return 0;
 }
