@@ -232,7 +232,29 @@ int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_
         return -1;
     }
 
-    (void)len_out; (void)data_out; // To be handled in next step
+    ObjectID computed_id;
+    compute_hash(full_obj, file_len, &computed_id);
+    if (memcmp(computed_id.hash, id->hash, HASH_SIZE) != 0) {
+        free(full_obj);
+        return -1;
+    }
+
+    size_t header_len = (null_terminator - (char*)full_obj) + 1;
+    size_t data_len = file_len - header_len;
+    // size from sscanf should equal data_len
+    if (size != data_len) {
+        free(full_obj);
+        return -1;
+    }
+
+    *data_out = malloc(data_len);
+    if (!*data_out) {
+        free(full_obj);
+        return -1;
+    }
+    memcpy(*data_out, full_obj + header_len, data_len);
+    *len_out = data_len;
+
     free(full_obj);
     return 0;
 }
