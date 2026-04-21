@@ -205,17 +205,44 @@ int index_save(const Index *index) {
 }
 
 // Stage a file for the next commit.
-//
-// HINTS - Useful functions and syscalls:
-//   - fopen, fread, fclose             : reading the target file's contents
-//   - object_write                     : saving the contents as OBJ_BLOB
-//   - stat / lstat                     : getting file metadata (size, mtime, mode)
-//   - index_find                       : checking if the file is already staged
-//
-// Returns 0 on success, -1 on error.
 int index_add(Index *index, const char *path) {
-    // TODO: Implement file staging
-    // (See Lab Appendix for logical steps)
-    (void)index; (void)path;
-    return -1;
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        perror("stat");
+        return -1;
+    }
+
+    if (!S_ISREG(st.st_mode)) {
+        fprintf(stderr, "error: '%s' is not a regular file\n", path);
+        return -1;
+    }
+
+    FILE *fp = fopen(path, "rb");
+    if (!fp) {
+        perror("fopen");
+        return -1;
+    }
+
+    void *data = malloc(st.st_size);
+    if (!data && st.st_size > 0) {
+        fclose(fp);
+        return -1;
+    }
+    if (st.st_size > 0 && fread(data, 1, st.st_size, fp) != (size_t)st.st_size) {
+        perror("fread");
+        free(data);
+        fclose(fp);
+        return -1;
+    }
+    fclose(fp);
+
+    ObjectID id;
+    if (object_write(OBJ_BLOB, data, st.st_size, &id) != 0) {
+        free(data);
+        return -1;
+    }
+    free(data);
+
+    // TODO: Update the index entry with the new hash and metadata
+    return 0;
 }
