@@ -180,9 +180,15 @@ static int write_tree_recursive(IndexEntry *entries, int count, int depth, Objec
         }
     }
 
-    // TODO: Finalize tree creation
-    (void)id_out;
-    return -1;
+    void *data;
+    size_t len;
+    if (tree_serialize(&tree, &data, &len) != 0) return -1;
+    if (object_write(OBJ_TREE, data, len, id_out) != 0) {
+        free(data);
+        return -1;
+    }
+    free(data);
+    return 0;
 }
 
 // Build a tree hierarchy from the current index and write all tree
