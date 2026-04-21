@@ -120,16 +120,16 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         return 0;
     }
 
-    char path[512];
+    char path[1024];
     object_path(id_out, path, sizeof(path));
 
-    char shard_dir[512];
+    char shard_dir[1024];
     char hex[HASH_HEX_SIZE + 1];
     hash_to_hex(id_out, hex);
     snprintf(shard_dir, sizeof(shard_dir), "%s/%.2s", OBJECTS_DIR, hex);
     mkdir(shard_dir, 0755);
 
-    char temp_path[512];
+    char temp_path[1024];
     snprintf(temp_path, sizeof(temp_path), "%s/temp_%s", shard_dir, hex + 2);
 
     int fd = open(temp_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
@@ -187,7 +187,7 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
 // The caller is responsible for calling free(*data_out).
 // Returns 0 on success, -1 on error (file not found, corrupt, etc.).
 int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out) {
-    char path[512];
+    char path[1024];
     object_path(id, path, sizeof(path));
 
     FILE *fp = fopen(path, "rb");
