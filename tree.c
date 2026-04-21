@@ -119,8 +119,38 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 #include "index.h"
 
 static int write_tree_recursive(IndexEntry *entries, int count, int depth, ObjectID *id_out) {
-    // TODO: Implement recursive tree building
-    (void)entries; (void)count; (void)depth; (void)id_out;
+    Tree tree = { .count = 0 };
+
+    for (int i = 0; i < count; ) {
+        char *path = entries[i].path;
+        char *start = path;
+
+        // Skip preceding directories to find the current level component
+        for (int d = 0; d < depth; d++) {
+            char *next_slash = strchr(start, '/');
+            if (!next_slash) return -1; // Should not happen if index is valid
+            start = next_slash + 1;
+        }
+
+        char *slash = strchr(start, '/');
+        if (!slash) {
+            // Leaf node: a file in the current directory level
+            if (tree.count >= MAX_TREE_ENTRIES) return -1;
+            TreeEntry *te = &tree.entries[tree.count++];
+            te->mode = entries[i].mode;
+            te->hash = entries[i].hash;
+            strncpy(te->name, start, sizeof(te->name) - 1);
+            te->name[sizeof(te->name) - 1] = '\0';
+            i++;
+        } else {
+            // Directory: needs recursive handling
+            // TODO: Implement subdirectory logic
+            i++; // Placeholder to avoid infinite loop
+        }
+    }
+
+    // TODO: Finalize tree creation
+    (void)id_out;
     return -1;
 }
 
