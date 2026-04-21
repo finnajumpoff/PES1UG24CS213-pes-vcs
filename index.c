@@ -160,21 +160,48 @@ int index_load(Index *index) {
     return 0;
 }
 
+static int compare_entries(const void *a, const void *b) {
+    const IndexEntry *ea = (const IndexEntry *)a;
+    const IndexEntry *eb = (const IndexEntry *)b;
+    return strcmp(ea->path, eb->path);
+}
+
 // Save the index to .pes/index atomically.
-//
-// HINTS - Useful functions and syscalls:
-//   - qsort                            : sorting the entries array by path
-//   - fopen (with "w"), fprintf        : writing to the temporary file
-//   - hash_to_hex                      : converting ObjectID for text output
-//   - fflush, fileno, fsync, fclose    : flushing userspace buffers and syncing to disk
-//   - rename                           : atomically moving the temp file over the old index
-//
-// Returns 0 on success, -1 on error.
 int index_save(const Index *index) {
-    // TODO: Implement atomic index saving
-    // (See Lab Appendix for logical steps)
-    (void)index;
-    return -1;
+    // Sort entries by path before saving
+    Index sorted_index = *index;
+    if (sorted_index.count > 0) {
+        qsort(sorted_index.entries, sorted_index.count, sizeof(IndexEntry), compare_entries);
+    }
+
+    char temp_path[512];
+    snprintf(temp_path, sizeof(temp_path), "%s.tmp", INDEX_FILE);
+
+    FILE *fp = fopen(temp_path, "w");
+    if (!fp) return -1;
+
+    char hash_hex[HASH_HEX_SIZE + 1];
+    for (int i = 0; i < sorted_index.count; i++) {
+        hash_to_hex(&sorted_index.entries[i].hash, hash_hex);
+        fprintf(fp, "%o %s %llu %u %s\n",
+                sorted_index.entries[i].mode,
+                hash_hex,
+                (unsigned long long)sorted_index.entries[i].mtime_sec,
+                sorted_index.entries[i].size,
+                sorted_index.entries[i].path);
+    }
+
+    fflush(fp);
+    int fd = fileno(fp);
+    fsync(fd);
+    fclose(fp);
+
+    if (rename(temp_path, INDEX_FILE) != 0) {
+        unlink(temp_path);
+        return -1;
+    }
+
+    return 0;
 }
 
 // Stage a file for the next commit.
